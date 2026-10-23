@@ -1,0 +1,22 @@
+The fix you're about to apply: app/models.py (the same code as deck slide 14)
+
+class Complaint(BaseModel):                         # what the case system sends us
+    id: str = Field(min_length=1, max_length=20)
+    text: str = Field(min_length=1, max_length=4000)
+    channel: Literal["email", "chat", "branch", "phone"] = "email"
+
+class TriageResult(BaseModel):                      # 1  BaseModel: a contract Pydantic checks
+    model_config = ConfigDict(extra="forbid")       # 2  reject fields we didn't ask for
+    category: Category                              # 3  enums: exact values only ("fraud ops" ✗)
+    priority: int = Field(ge=1, le=4)               # 4  a whole number from 1 to 4 ("urgent" ✗, 7 ✗)
+    team: Team                                      # 3
+    summary: str = Field(max_length=200)            # 4  at most 200 characters
+    needs_human: bool = False
+
+def parse_triage(raw: str) -> TriageResult:
+    try:
+        return TriageResult.model_validate_json(raw)   # 5  parse + check in one step; prose ✗
+    except ValidationError as e:
+        return human_review(f"invalid model output ({e.error_count()} error(s))")   # 6  your decision: never guess
+
+1-5 are what Pydantic adds. 6 is plain Python: what your service does when the check fails.
